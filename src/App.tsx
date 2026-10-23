@@ -36,41 +36,18 @@ function Bride({ img, role, full, parent }: { img: string; role: string; full: s
   );
 }
 
-function Gift({ bank, no, name }: { bank: string; no: string; name: string }) {
-  const [ok, setOk] = useState(false);
-  const copy = () => navigator.clipboard.writeText(no).then(() => { setOk(true); setTimeout(() => setOk(false), 2000); });
-  return (
-    <div className="atm rv">
-      <b>{bank}</b><div className="no">{no}</div><small>a.n. {name}</small>
-      <button onClick={copy}>{ok ? "Tersalin ✓" : "Salin nomor"}</button>
-    </div>
-  );
-}
-
 export default function App() {
   const [phase, setPhase] = useState<"tutup" | "sapa" | "buka">("tutup");
-  const [playing, setPlaying] = useState(false);
   const [zoom, setZoom] = useState<string | null>(null);
-  const [f, setF] = useState({ nama: guest, hadir: "ya", jml: 1, ucap: "" });
   const audio = useRef<HTMLAudioElement>(null);
   const cd = useCountdown(C.countdownTarget);
   useReveal();
 
   const buka = () => {
     setPhase("sapa");
-    audio.current?.play().then(() => setPlaying(true)).catch(() => {});
+    audio.current?.play().catch(() => {});
     setTimeout(() => { setPhase("buka"); document.body.classList.remove("lock"); window.scrollTo(0, 0); }, 1200);
   };
-  const toggleMusic = () => {
-    const a = audio.current; if (!a) return;
-    if (a.paused) { a.play(); setPlaying(true); } else { a.pause(); setPlaying(false); }
-  };
-  const kirim = () => {
-    const status = f.hadir === "ya" ? `insya Allah hadir (${f.jml} orang)` : "mohon maaf belum bisa hadir";
-    const msg = `Assalamu'alaikum, saya ${f.nama || "tamu undangan"}, ${status} di pernikahan ${C.groom} & ${C.bride}.${f.ucap ? `\n\nUcapan: ${f.ucap}` : ""}`;
-    window.open(`https://wa.me/${C.whatsapp}?text=${encodeURIComponent(msg)}`, "_blank");
-  };
-
   return (
     <>
       <audio ref={audio} src="/musik.mp3" loop preload="none" />
@@ -99,8 +76,7 @@ export default function App() {
       </div>
 
       {phase === "buka" && (<>
-        <button className="music" onClick={toggleMusic} aria-label="Musik">{playing ? "❚❚" : "♪"}</button>
-        <nav className="nav">{[["salam", "Awal"], ["mempelai", "Mempelai"], ["acara", "Acara"], ["galeri", "Galeri"], ["kado", "Kado"], ["rsvp", "RSVP"]].map(([id, t]) => <a key={id} href={`#${id}`}>{t}</a>)}</nav>
+        <nav className="nav">{[["salam", "Awal"], ["mempelai", "Mempelai"], ["acara", "Acara"], ["galeri", "Galeri"]].map(([id, t]) => <a key={id} href={`#${id}`}>{t}</a>)}</nav>
       </>)}
 
       <section id="salam" className="sec">
@@ -161,31 +137,8 @@ export default function App() {
         <div className="gallery">{P.slice(10, 14).map((s, i) => (
           <button key={s} className="gallery-photo" onClick={() => setZoom(s)} aria-label={`Perbesar foto ${i + 1} dari 4`}>
             <img src={s} alt="" loading="lazy" />
-            <span aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
           </button>
         ))}</div>
-      </section>
-
-      <section id="kado" className="sec alt">
-        <h2 className="gold">Kado Digital</h2>
-        <p className="small">Doa restu Anda sudah cukup bagi kami. Bila ingin berbagi kebahagiaan, dapat melalui:</p>
-        {C.banks.map(b => <Gift key={b.no} {...b} />)}
-      </section>
-
-      <section id="rsvp" className="sec">
-        <h2 className="gold">Konfirmasi Kehadiran</h2>
-        <div className="form rv">
-          <input placeholder="Nama" value={f.nama} onChange={e => setF({ ...f, nama: e.target.value })} />
-          <div className="seg">
-            <button className={f.hadir === "ya" ? "on" : ""} onClick={() => setF({ ...f, hadir: "ya" })}>Hadir</button>
-            <button className={f.hadir === "tidak" ? "on" : ""} onClick={() => setF({ ...f, hadir: "tidak" })}>Berhalangan</button>
-          </div>
-          {f.hadir === "ya" && <div className="step">
-            <button onClick={() => setF({ ...f, jml: Math.max(1, f.jml - 1) })} aria-label="Kurangi">−</button><span>{f.jml} orang</span>
-            <button onClick={() => setF({ ...f, jml: Math.min(6, f.jml + 1) })} aria-label="Tambah">+</button></div>}
-          <textarea rows={3} placeholder="Ucapan & doa (opsional)" value={f.ucap} onChange={e => setF({ ...f, ucap: e.target.value })} />
-          <button className="btn" onClick={kirim}>Kirim via WhatsApp</button>
-        </div>
       </section>
 
       <footer className="sec alt foot">
