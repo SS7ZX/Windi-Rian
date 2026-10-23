@@ -115,7 +115,7 @@ export default function App() {
       <section id="acara" className="sec alt">
         <h2 className="gold">Hari Bahagia</h2>
         <div className="cd rv">{Object.entries({ Hari: cd.Hari, Jam: cd.Jam, Menit: cd.Menit, Detik: cd.Detik }).map(([k, v]) => <div key={k}><b>{String(v).padStart(2, "0")}</b><small>{k}</small></div>)}</div>
-        <div className="evt rv"><small>Akad Nikah</small><b className="gold">{C.timeAkad}</b><p>{C.date}</p></div>
+        <div className="evt rv"><small>Ngunduh Mantu</small><b className="gold">{C.timeAkad}</b><p>{C.date}</p></div>
         <div className="evt rv"><small>Resepsi</small><b className="gold">{C.timeResepsi}</b><p>{C.date}</p></div>
         <div className="evt rv"><small>{C.venue}</small>{C.address && <p>{C.address}</p>}
           <a className="btn" href={C.mapsUrl} target="_blank" rel="noreferrer">Buka Google Maps</a>
