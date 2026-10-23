@@ -13,7 +13,7 @@ const TL = [ // edit cerita sesuai kisah kalian
   { img: P[9], t: "Hari Ini", d: "Kami melangkah menuju ikatan yang suci." },
 ];
 const cal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
-  `Ngunduh Mantu ${C.groom} & ${C.bride}`)}&dates=20261107T020000Z/20261107T070000Z&location=${encodeURIComponent(C.address)}`;
+  `Ngunduh Mantu ${C.groom} & ${C.bride}`)}&dates=20261129T030000Z/20261129T080000Z&location=${encodeURIComponent(C.address || C.venue)}`;
 
 const Medal = ({ id }: { id: string }) => (
   <svg className="medal" viewBox="0 0 100 100" aria-hidden="true">
@@ -117,7 +117,7 @@ export default function App() {
         <div className="cd rv">{Object.entries({ Hari: cd.Hari, Jam: cd.Jam, Menit: cd.Menit, Detik: cd.Detik }).map(([k, v]) => <div key={k}><b>{String(v).padStart(2, "0")}</b><small>{k}</small></div>)}</div>
         <div className="evt rv"><small>Akad Nikah</small><b className="gold">{C.timeAkad}</b><p>{C.date}</p></div>
         <div className="evt rv"><small>Resepsi</small><b className="gold">{C.timeResepsi}</b><p>{C.date}</p></div>
-        <div className="evt rv"><small>{C.venue}</small><p>{C.address}</p>
+        <div className="evt rv"><small>{C.venue}</small>{C.address && <p>{C.address}</p>}
           <a className="btn" href={C.mapsUrl} target="_blank" rel="noreferrer">Buka Google Maps</a>
           <a className="btn ghost" href={cal} target="_blank" rel="noreferrer">Simpan ke kalender</a></div>
       </section>
