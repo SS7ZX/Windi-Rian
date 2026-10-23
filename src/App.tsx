@@ -50,7 +50,7 @@ export default function App() {
   };
   return (
     <>
-      <audio ref={audio} src="/musik.mp3" loop preload="none" />
+      <audio ref={audio} src="/musik.mp3" loop autoPlay preload="auto" />
       <div className="progress" />
 
       <div className={`gate ${phase}`}>
