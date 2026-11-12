@@ -1,8 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { C, P } from "./config";
 import { useCountdown, useReveal } from "./hooks";
+import { lookupInvite } from "./admin/public-invite";
 
-const guest = new URLSearchParams(location.search).get("to") || "";
 const LIVE = ""; // isi link YouTube Live (https://...) kalau ada siaran langsung, kosongkan kalau tidak
 const TL = [ // edit cerita sesuai kisah kalian
   { img: P[3], t: "Pertama Bertemu", d: "Dua orang asing yang tak menyangka akan saling menemukan." },
@@ -37,11 +37,27 @@ function Bride({ img, role, full, parent }: { img: string; role: string; full: s
 }
 
 export default function App() {
+  const [inviteSlug] = useState(() => new URLSearchParams(location.search).get("invite"));
   const [phase, setPhase] = useState<"tutup" | "sapa" | "buka">("tutup");
   const [zoom, setZoom] = useState<string | null>(null);
+  const [guest, setGuest] = useState(inviteSlug ? "Memuat undangan..." : "Tamu Undangan");
+  const [inviteError, setInviteError] = useState("");
   const audio = useRef<HTMLAudioElement>(null);
   const cd = useCountdown(C.countdownTarget);
   useReveal();
+
+  useEffect(() => {
+    if (!inviteSlug) return;
+    let active = true;
+    lookupInvite(inviteSlug).then(name => {
+      if (active) setGuest(name);
+    }).catch(error => {
+      if (!active) return;
+      setGuest("Tamu Undangan");
+      setInviteError(error instanceof Error ? error.message : "Undangan personal tidak dapat dimuat.");
+    });
+    return () => { active = false; };
+  }, [inviteSlug]);
 
   const buka = () => {
     setPhase("sapa");
@@ -66,6 +82,7 @@ export default function App() {
         <div className="gate-in">
           <p className="dear">Dengan penuh rasa syukur, kami mengundang</p>
           <p className="gname">{guest || "Tamu Undangan"}</p>
+          {inviteError && <p className="cover-note" role="status">{inviteError}</p>}
           <p className="cover-note">untuk hadir dan memberikan doa restu</p>
           <button className="open" onClick={buka} disabled={phase !== "tutup"}>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
