@@ -92,7 +92,7 @@ export async function authorizeAdmin(request: Request, secret: string): Promise<
 }
 
 export async function verifyAdminPassword(password: string, passwordHash: string): Promise<boolean> {
-  const parts = passwordHash.split("$");
+  const parts = passwordHash.split(":");
   if (!isValidAdminPasswordHash(passwordHash)) return false;
   const iterations = Number(parts[1]);
   const saltHex = parts[2];
@@ -106,7 +106,7 @@ export async function verifyAdminPassword(password: string, passwordHash: string
 }
 
 export function isValidAdminPasswordHash(passwordHash: string): boolean {
-  const parts = passwordHash.split("$");
+  const parts = passwordHash.split(":");
   if (parts.length !== 4 || parts[0] !== "pbkdf2-sha256") return false;
   const iterations = Number(parts[1]);
   return Number.isInteger(iterations)

@@ -52,7 +52,10 @@ try {
   $derivedKey = $pbkdf2.GetBytes(32)
   $pbkdf2.Dispose()
 
-  $passwordHash = "pbkdf2-sha256`$310000`$" + [BitConverter]::ToString($salt).Replace("-", "").ToLowerInvariant() + "`$" + [BitConverter]::ToString($derivedKey).Replace("-", "").ToLowerInvariant()
+  $passwordHash = "pbkdf2-sha256:310000:" + [BitConverter]::ToString($salt).Replace("-", "").ToLowerInvariant() + ":" + [BitConverter]::ToString($derivedKey).Replace("-", "").ToLowerInvariant()
+  if ($passwordHash -notmatch '^pbkdf2-sha256:310000:[0-9a-f]{32}:[0-9a-f]{64}$') {
+    throw "Hash password admin gagal dibuat dengan format yang benar."
+  }
   $sessionSecret = [Convert]::ToBase64String($sessionSecretBytes)
   $lines = @(
     "ADMIN_USERNAME=$username",

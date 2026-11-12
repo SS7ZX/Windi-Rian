@@ -24,11 +24,14 @@ Deno.serve(async request => {
   const sessionSecret = Deno.env.get("ADMIN_SESSION_SECRET") ?? "";
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!/^[A-Za-z0-9._-]{1,64}$/.test(username)
-    || !isValidAdminPasswordHash(passwordHash)
-    || sessionSecret.length < 32
-    || !supabaseUrl
-    || !serviceRoleKey) {
+  const invalidConfiguration: string[] = [];
+  if (!/^[A-Za-z0-9._-]{1,64}$/.test(username)) invalidConfiguration.push("ADMIN_USERNAME");
+  if (!isValidAdminPasswordHash(passwordHash)) invalidConfiguration.push("ADMIN_PASSWORD_HASH");
+  if (sessionSecret.length < 32) invalidConfiguration.push("ADMIN_SESSION_SECRET");
+  if (!supabaseUrl) invalidConfiguration.push("SUPABASE_URL");
+  if (!serviceRoleKey) invalidConfiguration.push("SUPABASE_SERVICE_ROLE_KEY");
+  if (invalidConfiguration.length) {
+    console.error("Login admin has invalid server configuration:", invalidConfiguration);
     return json(request, { error: "Login admin belum dikonfigurasi di secret server." }, 503);
   }
 

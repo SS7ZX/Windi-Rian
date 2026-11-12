@@ -117,11 +117,12 @@ test("verifies PBKDF2-SHA256 admin passwords without storing plaintext", async (
   const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 310000 }, material, 256);
   const toHex = (bytes: Uint8Array) => Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
-  const hash = `pbkdf2-sha256$310000$${toHex(salt)}$${toHex(new Uint8Array(bits))}`;
+  const hash = `pbkdf2-sha256:310000:${toHex(salt)}:${toHex(new Uint8Array(bits))}`;
   assert.equal(isValidAdminPasswordHash(hash), true);
   assert.equal(await verifyAdminPassword(password, hash), true);
   assert.equal(await verifyAdminPassword("wrong-password", hash), false);
   assert.equal(await verifyAdminPassword(password, "invalid"), false);
+  assert.equal(isValidAdminPasswordHash(`pbkdf2-sha256$310000$${toHex(salt)}$${toHex(new Uint8Array(bits))}`), false);
   assert.equal(isValidAdminPasswordHash("invalid"), false);
 });
 
