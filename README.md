@@ -53,7 +53,7 @@ The guest data migration is in `supabase/migrations`. It enables RLS and revokes
 
 5. Build the static frontend with the same project URL and anon key in its deployment environment. Never put `ADMIN_PASSWORD_HASH`, `ADMIN_SESSION_SECRET`, or the service-role key in any `VITE_` variable or browser bundle. The username, password hash, session signing secret, and `APP_ORIGINS` must remain Supabase server-side secrets.
 
-Configure the static host to serve `index.html` for the `/admin` path as well, so direct navigation and refresh on `/admin` reach the Vite application.
+`vercel.json` rewrites `/admin` to the Vite app entry point so direct navigation and refresh work on Vercel. Other static hosts must provide the equivalent SPA fallback.
 
 `admin-session` verifies the configured username and PBKDF2 password hash, applies a server-side attempt limit, and issues a signed session that expires after four hours. `admin-guests` verifies that signed session on every operation. The Edge Functions enforce `APP_ORIGINS`; include the exact HTTPS production origin and the local origin(s) you use, without a trailing path. `public-invite` is intentionally public and returns only a guest's display name for a valid, unguessable invitation slug. Internal notes, phone numbers, RSVP, and wishes are not returned by that endpoint.
 
