@@ -17,6 +17,32 @@ export type GuestUpdateInput = GuestInput & {
   wishes: string | null;
 };
 
+export type PublicRsvpInput = {
+  slug: string;
+  rsvp_status: "attending" | "declined";
+  party_size: number;
+};
+
+export function validatePublicRsvp(value: unknown): PublicRsvpInput {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new GuestValidationError("Data konfirmasi tidak valid.");
+  }
+  const input = value as Record<string, unknown>;
+  if (typeof input.slug !== "string" || input.slug.length > 100 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.slug)) {
+    throw new GuestValidationError("Tautan undangan tidak valid.");
+  }
+  if (input.rsvp_status !== "attending" && input.rsvp_status !== "declined") {
+    throw new GuestValidationError("Pilih konfirmasi hadir atau tidak hadir.");
+  }
+  if (input.rsvp_status === "declined") {
+    return { slug: input.slug, rsvp_status: "declined", party_size: 1 };
+  }
+  if (typeof input.party_size !== "number" || !Number.isInteger(input.party_size) || input.party_size < 1 || input.party_size > 6) {
+    throw new GuestValidationError("Jumlah tamu hadir harus antara 1 dan 6 orang.");
+  }
+  return { slug: input.slug, rsvp_status: "attending", party_size: input.party_size };
+}
+
 export function normalizePhone(value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value !== "string") throw new GuestValidationError("Nomor WhatsApp harus berupa teks.");

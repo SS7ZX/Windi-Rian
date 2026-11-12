@@ -55,12 +55,12 @@ The guest data migration is in `supabase/migrations`. It enables RLS and revokes
 
 `vercel.json` rewrites `/admin` to the Vite app entry point so direct navigation and refresh work on Vercel. Other static hosts must provide the equivalent SPA fallback.
 
-`admin-session` verifies the configured username and PBKDF2 password hash, applies a server-side attempt limit, and issues a signed session that expires after four hours. `admin-guests` verifies that signed session on every operation. The Edge Functions enforce `APP_ORIGINS`; include the exact HTTPS production origin and the local origin(s) you use, without a trailing path. `public-invite` is intentionally public and returns only a guest's display name for a valid, unguessable invitation slug. Internal notes, phone numbers, RSVP, and wishes are not returned by that endpoint.
+`admin-session` verifies the configured username and PBKDF2 password hash, applies a server-side attempt limit, and issues a signed session that expires after four hours. `admin-guests` verifies that signed session on every operation. The Edge Functions enforce `APP_ORIGINS`; include the exact HTTPS production origin and the local origin(s) you use, without a trailing path. `public-invite` returns only a guest's display name for lookup and accepts RSVP status/count updates only for a valid personal invitation slug. It never returns phone numbers, internal notes, or wishes.
 
 ## Guest and WhatsApp behavior
 
 - Guest categories: Keluarga, Teman, Rekan Kerja, and Lainnya.
-- RSVP status, attendance count, and wishes can be reviewed or edited from the administrator's edit-guest form. The public RSVP section is intentionally not shown.
+- Guests opening their personal invitation can submit or update an RSVP status and attendance count; the response is stored on that guest record and is visible in the admin dashboard. Only `attending`/`declined` status and a count from 1–6 are accepted; public guests cannot change notes or other fields.
 - Each guest gets a unique slug when created. Editing the name does not modify that slug or invalidate the old link.
 - Personal links use the current site origin and the `?invite=...` query parameter.
 - WhatsApp sharing is manual only. The admin previews the message, opens WhatsApp with a normalized phone number and personal link, and then the admin must press Send in WhatsApp. The saved `Dibuka manual` status does not mean a message was sent or delivered.

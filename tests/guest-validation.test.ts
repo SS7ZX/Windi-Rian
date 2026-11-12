@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { authorizeAdmin, bearerToken, createAdminSession, isValidAdminPasswordHash, verifyAdminPassword, verifyAdminSession } from "../supabase/functions/_shared/admin-auth.ts";
 import { createGuestRecord, updateGuestRecord, type GuestRepository } from "../supabase/functions/_shared/guest-operations.ts";
-import { normalizePhone, slugForName, validateGuestInput, validateGuestUpdate } from "../supabase/functions/_shared/guest-validation.ts";
+import { normalizePhone, slugForName, validateGuestInput, validateGuestUpdate, validatePublicRsvp } from "../supabase/functions/_shared/guest-validation.ts";
 import { guestsCsv, invitationMessage, inviteUrl, normalizeWhatsAppNumber } from "../src/admin/guest-utils.ts";
 
 test("requires a non-empty guest name and a supported category", () => {
@@ -90,6 +90,42 @@ test("validates RSVP status, attendance count, and wishes on admin edit", () => 
   assert.throws(() => validateGuestUpdate({
     name: "Tamu",
     category: "Keluarga",
+    rsvp_status: "attending",
+    party_size: 7,
+  }), /antara 1 dan 6/);
+});
+
+test("validates public RSVP submissions and limits them to the selected invitation", () => {
+  assert.deepEqual(validatePublicRsvp({
+    slug: "windi-nuraeni-1234567890abcdef",
+    rsvp_status: "attending",
+    party_size: 2,
+  }), {
+    slug: "windi-nuraeni-1234567890abcdef",
+    rsvp_status: "attending",
+    party_size: 2,
+  });
+  assert.deepEqual(validatePublicRsvp({
+    slug: "windi-nuraeni-1234567890abcdef",
+    rsvp_status: "declined",
+    party_size: 6,
+  }), {
+    slug: "windi-nuraeni-1234567890abcdef",
+    rsvp_status: "declined",
+    party_size: 1,
+  });
+  assert.throws(() => validatePublicRsvp({
+    slug: "invalid slug",
+    rsvp_status: "attending",
+    party_size: 1,
+  }), /Tautan undangan tidak valid/);
+  assert.throws(() => validatePublicRsvp({
+    slug: "windi-nuraeni-1234567890abcdef",
+    rsvp_status: "pending",
+    party_size: 1,
+  }), /Pilih konfirmasi hadir atau tidak hadir/);
+  assert.throws(() => validatePublicRsvp({
+    slug: "windi-nuraeni-1234567890abcdef",
     rsvp_status: "attending",
     party_size: 7,
   }), /antara 1 dan 6/);

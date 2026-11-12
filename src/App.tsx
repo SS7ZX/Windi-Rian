@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { C, P } from "./config";
 import { useCountdown, useReveal } from "./hooks";
-import { lookupInvite } from "./admin/public-invite";
+import { lookupInvite, submitInviteRsvp, type RsvpChoice } from "./admin/public-invite";
 
 const LIVE = ""; // isi link YouTube Live (https://...) kalau ada siaran langsung, kosongkan kalau tidak
 const TL = [ // edit cerita sesuai kisah kalian
@@ -40,8 +40,14 @@ export default function App() {
   const [inviteSlug] = useState(() => new URLSearchParams(location.search).get("invite"));
   const [phase, setPhase] = useState<"tutup" | "sapa" | "buka">("tutup");
   const [zoom, setZoom] = useState<string | null>(null);
-  const [guest, setGuest] = useState(inviteSlug ? "Memuat undangan..." : "Tamu Undangan");
+  const [guest, setGuest] = useState(inviteSlug ? "" : "Tamu Undangan");
+  const [inviteLoading, setInviteLoading] = useState(Boolean(inviteSlug));
   const [inviteError, setInviteError] = useState("");
+  const [rsvpChoice, setRsvpChoice] = useState<RsvpChoice | "">("");
+  const [partySize, setPartySize] = useState(1);
+  const [rsvpBusy, setRsvpBusy] = useState(false);
+  const [rsvpError, setRsvpError] = useState("");
+  const [rsvpSuccess, setRsvpSuccess] = useState("");
   const audio = useRef<HTMLAudioElement>(null);
   const cd = useCountdown(C.countdownTarget);
   useReveal();
@@ -55,9 +61,25 @@ export default function App() {
       if (!active) return;
       setGuest("Tamu Undangan");
       setInviteError(error instanceof Error ? error.message : "Undangan personal tidak dapat dimuat.");
-    });
+    }).finally(() => { if (active) setInviteLoading(false); });
     return () => { active = false; };
   }, [inviteSlug]);
+
+  const submitRsvp = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!inviteSlug || !rsvpChoice || inviteLoading || inviteError) return;
+    setRsvpBusy(true);
+    setRsvpError("");
+    setRsvpSuccess("");
+    try {
+      await submitInviteRsvp(inviteSlug, rsvpChoice, partySize);
+      setRsvpSuccess(`Terima kasih, konfirmasi untuk ${guest} berhasil disimpan.`);
+    } catch (error) {
+      setRsvpError(error instanceof Error ? error.message : "Konfirmasi gagal disimpan. Silakan coba lagi.");
+    } finally {
+      setRsvpBusy(false);
+    }
+  };
 
   const buka = () => {
     setPhase("sapa");
@@ -80,20 +102,20 @@ export default function App() {
           <p className="cover-date">{C.dateFormal}</p>
         </div>
         <div className="gate-in">
-          <p className="dear">Dengan penuh rasa syukur, kami mengundang</p>
-          <p className="gname">{guest || "Tamu Undangan"}</p>
+          <p className="dear">Kepada Yth.</p>
+          <p className="gname" aria-live="polite">{inviteLoading ? "Memuat undangan..." : guest || "Tamu Undangan"}</p>
           {inviteError && <p className="cover-note" role="status">{inviteError}</p>}
-          <p className="cover-note">untuk hadir dan memberikan doa restu</p>
-          <button className="open" onClick={buka} disabled={phase !== "tutup"}>
+          <p className="cover-note">Dengan hormat kami mengundang untuk hadir dan memberikan doa restu</p>
+          <button className="open" onClick={buka} disabled={phase !== "tutup" || inviteLoading}>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
-            Buka Undangan
+            {inviteLoading ? "Memuat..." : "Buka Undangan"}
           </button>
           <p className="sorry">Mohon maaf apabila terdapat kesalahan penulisan nama atau gelar</p>
         </div>
       </div>
 
       {phase === "buka" && (<>
-        <nav className="nav">{[["salam", "Awal"], ["mempelai", "Mempelai"], ["acara", "Acara"], ["galeri", "Galeri"]].map(([id, t]) => <a key={id} href={`#${id}`}>{t}</a>)}</nav>
+        <nav className="nav">{[["salam", "Awal"], ["mempelai", "Mempelai"], ["acara", "Acara"], ...(inviteSlug && !inviteLoading && !inviteError ? [["konfirmasi", "RSVP"]] : []), ["galeri", "Galeri"]].map(([id, t]) => <a key={id} href={`#${id}`}>{t}</a>)}</nav>
       </>)}
 
       <section id="salam" className="sec">
@@ -137,7 +159,36 @@ export default function App() {
         <div className="evt rv"><small>{C.venue}</small>{C.address && <p>{C.address}</p>}
           <a className="btn" href={C.mapsUrl} target="_blank" rel="noreferrer">Buka Google Maps</a>
           <a className="btn ghost" href={cal} target="_blank" rel="noreferrer">Simpan ke kalender</a></div>
+        {inviteSlug && !inviteLoading && !inviteError && <a className="btn" href="#konfirmasi">Konfirmasi Kehadiran</a>}
       </section>
+
+      {inviteSlug && !inviteLoading && !inviteError && (
+        <section id="konfirmasi" className="sec">
+          <h2 className="gold">Konfirmasi Kehadiran</h2>
+          <p className="small">Konfirmasi untuk {guest}. Pilih jawaban dan jumlah yang hadir.</p>
+          <form className="rsvp-form" onSubmit={submitRsvp}>
+            <label>
+              Konfirmasi kehadiran
+              <select required value={rsvpChoice} onChange={event => setRsvpChoice(event.target.value as RsvpChoice | "")}>
+                <option value="">Pilih jawaban</option>
+                <option value="attending">Insyaallah hadir</option>
+                <option value="declined">Mohon maaf, tidak dapat hadir</option>
+              </select>
+            </label>
+            {rsvpChoice === "attending" && <label>
+              Jumlah yang hadir
+              <select value={partySize} onChange={event => setPartySize(Number(event.target.value))}>
+                {[1, 2, 3, 4, 5, 6].map(count => <option key={count} value={count}>{count} orang</option>)}
+              </select>
+            </label>}
+            {rsvpError && <p className="rsvp-message rsvp-error" role="alert">{rsvpError}</p>}
+            {rsvpSuccess && <p className="rsvp-message rsvp-success" role="status">{rsvpSuccess}</p>}
+            <button className="btn" type="submit" disabled={rsvpBusy || !rsvpChoice}>
+              {rsvpBusy ? "Menyimpan..." : rsvpSuccess ? "Perbarui Konfirmasi" : "Kirim Konfirmasi"}
+            </button>
+          </form>
+        </section>
+      )}
 
       {LIVE && (
         <section className="sec">

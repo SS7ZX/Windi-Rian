@@ -105,6 +105,16 @@ button:focus-visible,a:focus-visible{outline:3px solid var(--e1);outline-offset:
 .evt::after{right:5px;bottom:5px;border-width:0 1px 1px 0}
 .evt>small{font:500 .78rem var(--cap);letter-spacing:.28em;text-transform:uppercase;color:var(--e1)}
 .evt b{display:block;font:600 1.5rem var(--cap);margin:6px 0}
+.rsvp-form{display:grid;gap:16px;max-width:380px;margin:26px auto 0;text-align:left}
+.rsvp-form label{display:grid;gap:7px;color:var(--teks);font:500 .82rem var(--cap);letter-spacing:.04em}
+.rsvp-form select{min-height:46px;width:100%;padding:10px 12px;color:var(--teks);background:#100e0b;border:1px solid #c9a24a88;border-radius:8px;font:500 .9rem var(--serif)}
+.rsvp-form select:focus-visible{outline:2px solid var(--e1);outline-offset:2px}
+.rsvp-form select option{color:#f2e9d7;background:#100e0b}
+.rsvp-form .btn{width:100%;margin:0}
+.rsvp-form .btn:disabled{opacity:.55;cursor:not-allowed}
+.rsvp-message{padding:10px 12px;border-radius:8px;font-size:.88rem}
+.rsvp-error{color:#ffc7bd;background:#7c2d1233;border:1px solid #fda4af55}
+.rsvp-success{color:#d1fae5;background:#14532d55;border:1px solid #86efac55}
 
 /* galeri */
 .gallery{display:grid;gap:26px;margin-top:28px}
