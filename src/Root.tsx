@@ -7,6 +7,7 @@ export default function Root() {
   const isAdmin = window.location.pathname.replace(/\/+$/, "") === "/admin";
   useEffect(() => {
     document.body.classList.toggle("admin-body", isAdmin);
+    document.body.classList.toggle("lock", !isAdmin);
     return () => document.body.classList.remove("admin-body");
   }, [isAdmin]);
 

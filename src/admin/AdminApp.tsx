@@ -423,11 +423,11 @@ function RsvpBadge({ status, count }: { status: RsvpStatus; count?: number }) {
 
 function GuestActions({ guest, onEdit, onDelete, onCopy, onShare }: { guest: Guest; onEdit: () => void; onDelete: () => void; onCopy: () => void; onShare: () => void }) {
   return <div className="admin-row-actions">
-    <a className="admin-action-button" href={inviteUrl(guest)} target="_blank" rel="noreferrer" aria-label={`Lihat undangan ${guest.name}`} title="Lihat undangan"><Icon name="open" /></a>
-    <button className="admin-action-button" onClick={onCopy} aria-label={`Salin tautan ${guest.name}`} title="Salin tautan"><Icon name="copy" /></button>
-    <button className="admin-action-button admin-action-whatsapp" onClick={onShare} aria-label={`Bagikan WhatsApp ${guest.name}`} title="Bagikan manual via WhatsApp"><Icon name="message" /></button>
-    <button className="admin-action-button" onClick={onEdit} aria-label={`Edit ${guest.name}`} title="Edit"><Icon name="edit" /></button>
-    <button className="admin-action-button admin-action-delete" onClick={onDelete} aria-label={`Hapus ${guest.name}`} title="Hapus"><Icon name="trash" /></button>
+    <a className="admin-action-button" href={inviteUrl(guest)} target="_blank" rel="noreferrer" aria-label={`Lihat undangan ${guest.name}`} title="Lihat undangan"><Icon name="open" /><span className="admin-action-label">Lihat</span></a>
+    <button type="button" className="admin-action-button" onClick={onCopy} aria-label={`Salin tautan ${guest.name}`} title="Salin tautan"><Icon name="copy" /><span className="admin-action-label">Salin</span></button>
+    <button type="button" className="admin-action-button admin-action-whatsapp" onClick={onShare} aria-label={`Bagikan WhatsApp ${guest.name}`} title="Bagikan manual via WhatsApp"><Icon name="message" /><span className="admin-action-label">WhatsApp</span></button>
+    <button type="button" className="admin-action-button" onClick={onEdit} aria-label={`Edit ${guest.name}`} title="Edit"><Icon name="edit" /><span className="admin-action-label">Edit</span></button>
+    <button type="button" className="admin-action-button admin-action-delete" onClick={onDelete} aria-label={`Hapus ${guest.name}`} title="Hapus"><Icon name="trash" /><span className="admin-action-label">Hapus</span></button>
   </div>;
 }
 
