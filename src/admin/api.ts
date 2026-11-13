@@ -26,6 +26,12 @@ export function logoutAdmin(): void {
   sessionStorage.removeItem(sessionKey);
 }
 
+export type BulkGuestResult = {
+  index: number;
+  guest?: Guest;
+  error?: string;
+};
+
 function expireAdminSession(): void {
   logoutAdmin();
   window.dispatchEvent(new Event("admin-session-expired"));
@@ -58,6 +64,14 @@ export async function listGuests(): Promise<Guest[]> {
 export async function createGuest(guest: GuestDraft): Promise<Guest> {
   const result = await request<{ guest: Guest }>("admin-guests", "POST", guest);
   return result.guest;
+}
+
+export async function createGuestsBulk(guests: GuestDraft[]): Promise<BulkGuestResult[]> {
+  const result = await request<{ results: BulkGuestResult[] }>("admin-guests", "POST", {
+    action: "bulk_create",
+    guests,
+  });
+  return result.results;
 }
 
 export async function updateGuest(id: string, guest: GuestUpdateDraft): Promise<Guest> {

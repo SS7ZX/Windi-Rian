@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { authorizeAdmin, bearerToken, createAdminSession, isValidAdminPasswordHash, verifyAdminPassword, verifyAdminSession } from "../supabase/functions/_shared/admin-auth.ts";
-import { createGuestRecord, updateGuestRecord, type GuestRepository } from "../supabase/functions/_shared/guest-operations.ts";
+import { createGuestRecord, prepareGuestBatch, updateGuestRecord, type GuestRepository } from "../supabase/functions/_shared/guest-operations.ts";
 import { normalizePhone, slugForName, validateGuestInput, validateGuestUpdate, validatePublicRsvp } from "../supabase/functions/_shared/guest-validation.ts";
-import { guestsCsv, invitationMessage, inviteUrl, normalizeWhatsAppNumber } from "../src/admin/guest-utils.ts";
+import { guestAnalytics, guestsCsv, invitationMessage, inviteUrl, normalizeWhatsAppNumber } from "../src/admin/guest-utils.ts";
 
 test("requires a non-empty guest name and a supported category", () => {
   assert.throws(() => validateGuestInput({ name: "   ", category: "Teman" }), /Nama tamu wajib diisi/);
@@ -51,6 +51,20 @@ test("admin create stores a validated guest with a unique personal slug", async 
   assert.equal(result.data?.name, "Rian Windi");
   assert.match(String(result.data?.slug), /^rian-windi-[a-f0-9]{32}$/);
   assert.equal(rows.length, 1);
+});
+
+test("validates bulk guest rows independently and assigns a unique slug to each valid row", () => {
+  const { rows, results } = prepareGuestBatch([
+    { name: "  Rian  Windi ", phone: "", category: "Keluarga" },
+    { name: "   ", phone: "", category: "Keluarga" },
+    { name: "Rian Windi", phone: "", category: "Teman" },
+  ]);
+  assert.equal(rows.length, 2);
+  assert.equal(results[1].error, "Nama tamu wajib diisi.");
+  assert.equal(rows[0].guest.name, "Rian Windi");
+  assert.notEqual(rows[0].guest.slug, rows[1].guest.slug);
+  assert.throws(() => prepareGuestBatch([], 500), /minimal satu baris/);
+  assert.throws(() => prepareGuestBatch([{ name: "Rian" }], 0), /Maksimum/);
 });
 
 test("admin edit updates validated fields without changing the existing slug", async () => {
@@ -129,6 +143,40 @@ test("validates public RSVP submissions and limits them to the selected invitati
     rsvp_status: "attending",
     party_size: 7,
   }), /antara 1 dan 6/);
+});
+
+test("summarizes RSVP metrics without category breakdowns and handles empty data", () => {
+  const baseGuest = {
+    id: "guest",
+    name: "Tamu",
+    phone: null,
+    relation: null,
+    category: "Keluarga" as const,
+    internal_note: null,
+    slug: "tamu-1234567890abcdef",
+    party_size: 1,
+    wishes: null,
+    whatsapp_status: "not_sent" as const,
+    whatsapp_opened_at: null,
+    created_at: "",
+    updated_at: "",
+  };
+  const stats = guestAnalytics([
+    { ...baseGuest, id: "one", rsvp_status: "attending" as const, party_size: 3 },
+    { ...baseGuest, id: "two", rsvp_status: "declined" as const },
+    { ...baseGuest, id: "three", rsvp_status: "pending" as const, wishes: "Semoga bahagia" },
+  ]);
+  assert.deepEqual(stats, {
+    total: 3,
+    attending: 1,
+    attendanceHeadcount: 3,
+    declined: 1,
+    pending: 1,
+    responded: 2,
+    responseRate: 67,
+    wishes: 1,
+  });
+  assert.equal(guestAnalytics([]).responseRate, 0);
 });
 
 test("requires a valid signed admin session for private API requests", async () => {

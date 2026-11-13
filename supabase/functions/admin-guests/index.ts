@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { authorizeAdmin, bearerToken } from "../_shared/admin-auth.ts";
 import { adminCorsHeaders, isAllowedOrigin } from "../_shared/admin-cors.ts";
-import { createGuestRecord, deleteGuestRecord, updateGuestRecord, type GuestRepository } from "../_shared/guest-operations.ts";
+import { createGuestRecord, deleteGuestRecord, prepareGuestBatch, updateGuestRecord, type GuestRepository } from "../_shared/guest-operations.ts";
 import { GuestValidationError } from "../_shared/guest-validation.ts";
 
 function json(request: Request, body: unknown, status = 200): Response {
@@ -25,6 +25,9 @@ Deno.serve(async request => {
   if (!isAllowedOrigin(request, appOrigins)) return json(request, { error: "Origin tidak diizinkan." }, 403);
   if (request.method === "OPTIONS") return new Response("ok", { headers: adminCorsHeaders(request, appOrigins) });
   if (!bearerToken(request)) return json(request, { error: "Sesi admin diperlukan." }, 401);
+  if (Number(request.headers.get("content-length") ?? 0) > 2_500_000) {
+    return json(request, { error: "Ukuran permintaan terlalu besar." }, 413);
+  }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -75,6 +78,34 @@ Deno.serve(async request => {
 
     if (request.method === "POST") {
       const body = await readJson(request) as Record<string, unknown> | null;
+      if (body?.action === "bulk_create") {
+        const { rows: validRows, results } = prepareGuestBatch(body.guests);
+
+        if (validRows.length) {
+          const { data, error } = await supabase.from("guests")
+            .insert(validRows.map(row => row.guest))
+            .select("id,name,phone,relation,category,internal_note,slug,rsvp_status,party_size,wishes,whatsapp_status,whatsapp_opened_at,created_at,updated_at");
+          if (error) {
+            const message = error.code === "23505"
+              ? "Data bentrok dengan tamu yang sudah ada. Periksa kembali lalu coba impor lagi."
+              : "Database gagal menyimpan baris impor. Tidak ada baris valid dari batch ini yang disimpan.";
+            for (const row of validRows) {
+              const result = results[row.index];
+              if (result) result.error = message;
+            }
+          } else {
+            const guestsBySlug = new Map((data ?? []).map(guest => [String(guest.slug), guest]));
+            for (const row of validRows) {
+              const guest = guestsBySlug.get(String(row.guest.slug));
+              const result = results[row.index];
+              if (guest && result) Object.assign(result, { guest });
+              else if (result) result.error = "Penyimpanan belum dapat diverifikasi. Muat ulang daftar sebelum mengulang impor.";
+            }
+          }
+        }
+        return json(request, { results });
+      }
+
       if (body?.action === "manual_whatsapp_opened") {
         if (typeof body.id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.id)) {
           return json(request, { error: "ID tamu tidak valid." }, 400);

@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { supabaseConfigured } from "./supabase";
-import { createGuest, deleteGuest, getAdminToken, listGuests, loginAdmin, logoutAdmin, markWhatsAppOpened, updateGuest } from "./api";
+import { createGuest, deleteGuest, getAdminToken, listGuests, loginAdmin, logoutAdmin, markWhatsAppOpened, updateGuest, type BulkGuestResult } from "./api";
 import { emptyGuestDraft, guestCategories, type Guest, type GuestDraft, type GuestUpdateDraft, type RsvpStatus } from "./types";
-import { guestsCsv, invitationMessage, inviteUrl, normalizeWhatsAppNumber, validateGuestDraft } from "./guest-utils";
+import { guestAnalytics, guestsCsv, invitationMessage, inviteUrl, normalizeWhatsAppNumber, validateGuestDraft } from "./guest-utils";
+import GuestImportModal from "./GuestImportModal";
 import "./admin.css";
 
 type ModalState =
   | { type: "form"; guest: Guest | null }
   | { type: "delete"; guest: Guest }
   | { type: "whatsapp"; guest: Guest }
+  | { type: "import" }
   | null;
 type Toast = { type: "success" | "error"; message: string };
 
@@ -18,11 +20,12 @@ const rsvpLabels: Record<RsvpStatus, string> = {
   declined: "Tidak hadir",
 };
 
-function Icon({ name }: { name: "search" | "plus" | "download" | "edit" | "trash" | "copy" | "open" | "message" | "logout" | "users" | "check" | "clock" | "heart" }) {
+function Icon({ name }: { name: "search" | "plus" | "download" | "upload" | "edit" | "trash" | "copy" | "open" | "message" | "logout" | "users" | "check" | "clock" | "heart" }) {
   const paths: Record<typeof name, string> = {
     search: "M21 21l-4.3-4.3M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4Z",
     plus: "M12 5v14M5 12h14",
     download: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5 5 5 5-5m-5 5V3",
+    upload: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5 5-5 5 5m-5-5v12",
     edit: "M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z",
     trash: "M3 6h18m-2 0-.9 14H5.9L5 6m3 0V4h8v2m-7 4v6m4-6v6",
     copy: "M8 8V4h12v12h-4M4 8h12v12H4z",
@@ -201,10 +204,7 @@ export default function AdminApp() {
   }), [guests, query, categoryFilter, rsvpFilter]);
 
   const stats = useMemo(() => ({
-    total: guests.length,
-    attending: guests.filter(guest => guest.rsvp_status === "attending").length,
-    pending: guests.filter(guest => guest.rsvp_status === "pending").length,
-    wishes: guests.filter(guest => Boolean(guest.wishes?.trim())).length,
+    ...guestAnalytics(guests),
   }), [guests]);
 
   const signIn = async (username: string, password: string) => {
@@ -235,6 +235,23 @@ export default function AdminApp() {
       setToast({ type: "success", message: "Tamu berhasil ditambahkan." });
     }
     setModal(null);
+  };
+
+  const importedGuests = (created: Guest[], results: BulkGuestResult[]) => {
+    if (created.length) {
+      setGuests(current => [...created.slice().reverse(), ...current]);
+    }
+    const failed = results.length - created.length;
+    if (failed === 0) {
+      setToast({ type: "success", message: `${created.length} tamu berhasil ditambahkan.` });
+    } else {
+      setToast({
+        type: created.length ? "success" : "error",
+        message: created.length
+          ? `${created.length} tamu ditambahkan. Periksa ${failed} baris yang gagal pada pratinjau impor.`
+          : `Impor gagal untuk ${failed} baris. Periksa hasil per baris pada pratinjau.`,
+      });
+    }
   };
 
   const confirmDelete = async () => {
@@ -303,14 +320,38 @@ export default function AdminApp() {
       <div className="admin-content">
         <section className="admin-page-heading">
           <div><p className="admin-eyebrow">DASHBOARD UNDANGAN</p><h1>Daftar Tamu</h1><p className="admin-muted">Kelola undangan dan pantau konfirmasi kehadiran.</p></div>
-          <button className="admin-button admin-button-primary" onClick={() => setModal({ type: "form", guest: null })}><Icon name="plus" />Tambah tamu</button>
+          <div className="admin-heading-actions">
+            <button className="admin-button admin-button-light" onClick={() => setModal({ type: "import" })}><Icon name="upload" />Impor tamu</button>
+            <button className="admin-button admin-button-primary" onClick={() => setModal({ type: "form", guest: null })}><Icon name="plus" />Tambah tamu</button>
+          </div>
         </section>
 
-        <section className="admin-stats" aria-label="Ringkasan tamu">
-          <StatCard icon="users" label="Total tamu" value={stats.total} tone="blue" />
-          <StatCard icon="check" label="Konfirmasi hadir" value={stats.attending} tone="green" />
-          <StatCard icon="clock" label="Belum konfirmasi" value={stats.pending} tone="amber" />
-          <StatCard icon="heart" label="Ucapan masuk" value={stats.wishes} tone="rose" />
+        <section className="admin-analytics" aria-labelledby="admin-analytics-title">
+          <div className="admin-analytics-heading">
+            <div><p className="admin-eyebrow">PANTAU KEHADIRAN</p><h2 id="admin-analytics-title">Analitik RSVP</h2></div>
+            <p>{stats.responded} dari {stats.total} undangan sudah merespons</p>
+          </div>
+          <div className="admin-stats" aria-label="Ringkasan tamu dan RSVP">
+            <StatCard icon="users" label="Total undangan" value={stats.total} detail="Seluruh tamu terdaftar" tone="blue" active={rsvpFilter === "Semua status"} onClick={() => setRsvpFilter("Semua status")} />
+            <StatCard icon="check" label="Akan hadir" value={stats.attending} detail={`${stats.attendanceHeadcount} orang total hadir`} tone="green" active={rsvpFilter === "attending"} onClick={() => setRsvpFilter("attending")} />
+            <StatCard icon="clock" label="Belum merespons" value={stats.pending} detail="Perlu tindak lanjut" tone="amber" active={rsvpFilter === "pending"} onClick={() => setRsvpFilter("pending")} />
+            <StatCard icon="users" label="Berhalangan hadir" value={stats.declined} detail="Sudah memberi kabar" tone="rose" active={rsvpFilter === "declined"} onClick={() => setRsvpFilter("declined")} />
+            <StatCard icon="check" label="Tingkat respons" value={`${stats.responseRate}%`} detail={`${stats.responded} undangan menjawab`} tone="blue" active={false} />
+            <StatCard icon="heart" label="Ucapan masuk" value={stats.wishes} detail="Ucapan/doa tersimpan" tone="rose" active={false} />
+          </div>
+          <div className="admin-response-panel">
+            <div className="admin-response-heading"><strong>Progres konfirmasi</strong><span>{stats.total ? `${stats.pending} undangan masih menunggu` : "Belum ada data tamu"}</span></div>
+            <div className="admin-response-track" role="img" aria-label={`${stats.attending} hadir, ${stats.declined} berhalangan, ${stats.pending} belum merespons`}>
+              <span className="admin-response-attending" style={{ width: `${stats.total ? stats.attending / stats.total * 100 : 0}%` }} />
+              <span className="admin-response-declined" style={{ width: `${stats.total ? stats.declined / stats.total * 100 : 0}%` }} />
+              <span className="admin-response-pending" style={{ width: `${stats.total ? stats.pending / stats.total * 100 : 0}%` }} />
+            </div>
+            <div className="admin-response-legend">
+              <button onClick={() => setRsvpFilter("attending")}><i className="admin-dot is-attending" />Hadir <b>{stats.attending}</b></button>
+              <button onClick={() => setRsvpFilter("declined")}><i className="admin-dot is-declined" />Berhalangan <b>{stats.declined}</b></button>
+              <button onClick={() => setRsvpFilter("pending")}><i className="admin-dot is-pending" />Belum merespons <b>{stats.pending}</b></button>
+            </div>
+          </div>
         </section>
 
         <section className="admin-panel">
@@ -334,13 +375,25 @@ export default function AdminApp() {
       {modal?.type === "form" && <GuestForm guest={modal.guest} onClose={() => setModal(null)} onSave={saveGuest} />}
       {modal?.type === "delete" && <ConfirmDelete guest={modal.guest} busy={deleting} onCancel={() => setModal(null)} onConfirm={() => void confirmDelete()} />}
       {modal?.type === "whatsapp" && <WhatsAppPreview guest={modal.guest} onClose={() => setModal(null)} onOpened={url => void shareManually(modal.guest, url)} onEdit={() => setModal({ type: "form", guest: modal.guest })} />}
+      {modal?.type === "import" && <GuestImportModal guests={guests} onClose={() => setModal(null)} onImported={importedGuests} />}
       {toast && <div className={`admin-toast admin-toast-${toast.type}`} role={toast.type === "error" ? "alert" : "status"} aria-live="polite">{toast.message}</div>}
     </main>
   );
 }
 
-function StatCard({ icon, label, value, tone }: { icon: "users" | "check" | "clock" | "heart"; label: string; value: number; tone: string }) {
-  return <article className="admin-stat-card"><span className={`admin-stat-icon admin-tone-${tone}`}><Icon name={icon} /></span><div><p>{label}</p><strong>{value}</strong></div></article>;
+function StatCard({ icon, label, value, detail, tone, active, onClick }: {
+  icon: "users" | "check" | "clock" | "heart";
+  label: string;
+  value: number | string;
+  detail: string;
+  tone: string;
+  active: boolean;
+  onClick?: () => void;
+}) {
+  const content = <><span className={`admin-stat-icon admin-tone-${tone}`}><Icon name={icon} /></span><span className="admin-stat-copy"><span className="admin-stat-label">{label}</span><strong>{value}</strong><small>{detail}</small></span></>;
+  return onClick
+    ? <button type="button" className={`admin-stat-card admin-stat-button ${active ? "is-active" : ""}`} onClick={onClick} aria-pressed={active}>{content}</button>
+    : <article className="admin-stat-card">{content}</article>;
 }
 
 function GuestRow({ guest, onEdit, onDelete, onCopy, onShare }: { guest: Guest; onEdit: () => void; onDelete: () => void; onCopy: () => void; onShare: () => void }) {

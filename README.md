@@ -61,6 +61,8 @@ The guest data migration is in `supabase/migrations`. It enables RLS and revokes
 
 - Guest categories: Keluarga, Teman, Rekan Kerja, and Lainnya.
 - Guests opening their personal invitation can submit or update an RSVP status and attendance count; the response is stored on that guest record and is visible in the admin dashboard. Only `attending`/`declined` status and a count from 1–6 are accepted; public guests cannot change notes or other fields.
+- The admin dashboard summarizes RSVP responses, response rate, confirmed headcount, pending replies, declines, and wishes without category analytics. Clicking an RSVP metric filters the guest list.
+- Bulk guest import supports CSV files and pasted comma/tab-separated rows, with a downloadable template, preview, row validation, and confirmation before saving. Imports are limited to 500 rows; likely duplicate phone numbers (or names when no phone is given) are flagged and unchecked by default, but an admin can explicitly select a flagged row.
 - Each guest gets a unique slug when created. Editing the name does not modify that slug or invalidate the old link.
 - Personal links use the current site origin and the `?invite=...` query parameter.
 - WhatsApp sharing is manual only. The admin previews the message, opens WhatsApp with a normalized phone number and personal link, and then the admin must press Send in WhatsApp. The saved `Dibuka manual` status does not mean a message was sent or delivered.

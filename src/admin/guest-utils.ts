@@ -38,6 +38,23 @@ export function invitationMessage(guest: Pick<Guest, "name" | "slug">, origin = 
   ].join("\n");
 }
 
+export function guestAnalytics(guests: Guest[]) {
+  const attending = guests.filter(guest => guest.rsvp_status === "attending");
+  const declined = guests.filter(guest => guest.rsvp_status === "declined").length;
+  const pending = guests.filter(guest => guest.rsvp_status === "pending").length;
+  const responded = attending.length + declined;
+  return {
+    total: guests.length,
+    attending: attending.length,
+    attendanceHeadcount: attending.reduce((total, guest) => total + guest.party_size, 0),
+    declined,
+    pending,
+    responded,
+    responseRate: guests.length ? Math.round((responded / guests.length) * 100) : 0,
+    wishes: guests.filter(guest => Boolean(guest.wishes?.trim())).length,
+  };
+}
+
 function csvCell(value: string | number | null): string {
   const text = String(value ?? "");
   const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
