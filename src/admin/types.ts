@@ -20,6 +20,15 @@ export type Guest = {
   updated_at: string;
 };
 
+export type GuestMessage = {
+  id: string;
+  guest_id: string;
+  message: string;
+  read_at: string | null;
+  created_at: string;
+  guest: Pick<Guest, "name" | "phone" | "slug">;
+};
+
 export type GuestDraft = Pick<Guest, "name" | "phone" | "relation" | "category" | "internal_note">;
 export type GuestUpdateDraft = GuestDraft & Pick<Guest, "rsvp_status" | "party_size" | "wishes">;
 

@@ -1,5 +1,5 @@
 import { functionsUrl } from "./supabase";
-import type { Guest, GuestDraft, GuestUpdateDraft } from "./types";
+import type { Guest, GuestDraft, GuestMessage, GuestUpdateDraft } from "./types";
 
 const sessionKey = "windi-admin-session";
 
@@ -59,6 +59,18 @@ async function request<T>(functionName: string, method: string, body?: unknown):
 export async function listGuests(): Promise<Guest[]> {
   const result = await request<{ guests: Guest[] }>("admin-guests", "GET");
   return result.guests;
+}
+
+export async function listGuestMessages(): Promise<GuestMessage[]> {
+  const result = await request<{ messages: GuestMessage[] }>("admin-guests?resource=messages", "GET");
+  return result.messages;
+}
+
+export async function markGuestMessageRead(id: string): Promise<Pick<GuestMessage, "id" | "read_at">> {
+  const result = await request<{ message: Pick<GuestMessage, "id" | "read_at"> }>(
+    "admin-guests", "POST", { action: "mark_message_read", id },
+  );
+  return result.message;
 }
 
 export async function createGuest(guest: GuestDraft): Promise<Guest> {

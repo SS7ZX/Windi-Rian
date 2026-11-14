@@ -108,10 +108,12 @@ button:focus-visible,a:focus-visible{outline:3px solid var(--e1);outline-offset:
 .rsvp-form{display:grid;gap:16px;max-width:380px;margin:26px auto 0;text-align:left}
 .rsvp-form label{display:grid;gap:7px;color:var(--teks);font:500 .82rem var(--cap);letter-spacing:.04em}
 .rsvp-form select{min-height:46px;width:100%;padding:10px 12px;color:var(--teks);background:#100e0b;border:1px solid #c9a24a88;border-radius:8px;font:500 .9rem var(--serif)}
-.rsvp-form select:focus-visible{outline:2px solid var(--e1);outline-offset:2px}
+.rsvp-form textarea{min-height:130px;width:100%;padding:12px;color:var(--teks);background:#100e0b;border:1px solid #c9a24a88;border-radius:8px;font:400 .95rem/1.6 var(--serif);resize:vertical}
+.rsvp-form select:focus-visible,.rsvp-form textarea:focus-visible{outline:2px solid var(--e1);outline-offset:2px}
 .rsvp-form select option{color:#f2e9d7;background:#100e0b}
 .rsvp-form .btn{width:100%;margin:0}
 .rsvp-form .btn:disabled{opacity:.55;cursor:not-allowed}
+.message-character-count{justify-self:end;margin-top:-12px;color:var(--e1);font:400 .75rem var(--cap)}
 .rsvp-message{padding:10px 12px;border-radius:8px;font-size:.88rem}
 .rsvp-error{color:#ffc7bd;background:#7c2d1233;border:1px solid #fda4af55}
 .rsvp-success{color:#d1fae5;background:#14532d55;border:1px solid #86efac55}

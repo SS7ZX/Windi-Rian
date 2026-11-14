@@ -29,3 +29,21 @@ export async function submitInviteRsvp(slug: string, rsvpStatus: RsvpChoice, par
     throw new Error(result.error || `Konfirmasi gagal disimpan (${response.status}).`);
   }
 }
+
+export async function submitInviteMessage(slug: string, message: string): Promise<void> {
+  const url = import.meta.env.VITE_SUPABASE_URL?.trim();
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+  if (!url || !anonKey) throw new Error("Layanan pesan undangan belum dikonfigurasi.");
+  const response = await fetch(`${url.replace(/\/$/, "")}/functions/v1/public-invite`, {
+    method: "POST",
+    headers: {
+      apikey: anonKey,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ action: "guest_message", slug, message }),
+  });
+  const result = await response.json().catch(() => ({})) as { success?: boolean; error?: string };
+  if (!response.ok || result.success !== true) {
+    throw new Error(result.error || `Pesan gagal dikirim (${response.status}).`);
+  }
+}

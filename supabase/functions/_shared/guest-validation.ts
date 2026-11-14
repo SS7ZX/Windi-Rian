@@ -23,12 +23,34 @@ export type PublicRsvpInput = {
   party_size: number;
 };
 
+export type PublicGuestMessageInput = {
+  slug: string;
+  message: string;
+};
+
+function validInviteSlug(value: unknown): value is string {
+  return typeof value === "string" && value.length <= 100 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
+}
+
+export function validatePublicGuestMessage(value: unknown): PublicGuestMessageInput {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new GuestValidationError("Data pesan tidak valid.");
+  }
+  const input = value as Record<string, unknown>;
+  if (!validInviteSlug(input.slug)) throw new GuestValidationError("Tautan undangan tidak valid.");
+  if (typeof input.message !== "string") throw new GuestValidationError("Pesan harus berupa teks.");
+  const message = input.message.replace(/\r\n?/g, "\n").trim();
+  if (!message) throw new GuestValidationError("Tulis pesan terlebih dahulu.");
+  if (message.length > 2000) throw new GuestValidationError("Pesan maksimal 2000 karakter.");
+  return { slug: input.slug, message };
+}
+
 export function validatePublicRsvp(value: unknown): PublicRsvpInput {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new GuestValidationError("Data konfirmasi tidak valid.");
   }
   const input = value as Record<string, unknown>;
-  if (typeof input.slug !== "string" || input.slug.length > 100 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.slug)) {
+  if (!validInviteSlug(input.slug)) {
     throw new GuestValidationError("Tautan undangan tidak valid.");
   }
   if (input.rsvp_status !== "attending" && input.rsvp_status !== "declined") {

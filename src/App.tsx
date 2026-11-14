@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { C, P } from "./config";
 import { useCountdown, useReveal } from "./hooks";
-import { lookupInvite, submitInviteRsvp, type RsvpChoice } from "./admin/public-invite";
+import { lookupInvite, submitInviteMessage, submitInviteRsvp, type RsvpChoice } from "./admin/public-invite";
 
 const LIVE = ""; // isi link YouTube Live (https://...) kalau ada siaran langsung, kosongkan kalau tidak
 const TL = [ // edit cerita sesuai kisah kalian
@@ -48,6 +48,10 @@ export default function App() {
   const [rsvpBusy, setRsvpBusy] = useState(false);
   const [rsvpError, setRsvpError] = useState("");
   const [rsvpSuccess, setRsvpSuccess] = useState("");
+  const [guestMessage, setGuestMessage] = useState("");
+  const [messageBusy, setMessageBusy] = useState(false);
+  const [messageError, setMessageError] = useState("");
+  const [messageSuccess, setMessageSuccess] = useState("");
   const audio = useRef<HTMLAudioElement>(null);
   const cd = useCountdown(C.countdownTarget);
   useReveal();
@@ -78,6 +82,21 @@ export default function App() {
       setRsvpError(error instanceof Error ? error.message : "Konfirmasi gagal disimpan. Silakan coba lagi.");
     } finally {
       setRsvpBusy(false);
+    }
+  };
+
+  const submitMessage = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!inviteSlug || inviteLoading || inviteError || messageSuccess) return;
+    setMessageBusy(true);
+    setMessageError("");
+    try {
+      await submitInviteMessage(inviteSlug, guestMessage);
+      setMessageSuccess("Pesan berhasil dikirim. Terima kasih sudah berbagi doa dan harapan.");
+    } catch (error) {
+      setMessageError(error instanceof Error ? error.message : "Pesan gagal dikirim. Silakan coba lagi.");
+    } finally {
+      setMessageBusy(false);
     }
   };
 
@@ -115,7 +134,7 @@ export default function App() {
       </div>
 
       {phase === "buka" && (<>
-        <nav className="nav">{[["salam", "Awal"], ["mempelai", "Mempelai"], ["acara", "Acara"], ...(inviteSlug && !inviteLoading && !inviteError ? [["konfirmasi", "RSVP"]] : []), ["galeri", "Galeri"]].map(([id, t]) => <a key={id} href={`#${id}`}>{t}</a>)}</nav>
+        <nav className="nav">{[["salam", "Awal"], ["mempelai", "Mempelai"], ["acara", "Acara"], ...(inviteSlug && !inviteLoading && !inviteError ? [["konfirmasi", "RSVP"], ["pesan", "Pesan"]] : []), ["galeri", "Galeri"]].map(([id, t]) => <a key={id} href={`#${id}`}>{t}</a>)}</nav>
       </>)}
 
       <section id="salam" className="sec">
@@ -185,6 +204,35 @@ export default function App() {
             {rsvpSuccess && <p className="rsvp-message rsvp-success" role="status">{rsvpSuccess}</p>}
             <button className="btn" type="submit" disabled={rsvpBusy || !rsvpChoice}>
               {rsvpBusy ? "Menyimpan..." : rsvpSuccess ? "Perbarui Konfirmasi" : "Kirim Konfirmasi"}
+            </button>
+          </form>
+        </section>
+      )}
+
+      {inviteSlug && !inviteLoading && !inviteError && (
+        <section id="pesan" className="sec alt">
+          <h2 className="gold">Kirim Pesan</h2>
+          <p className="small">Sampaikan doa, ucapan, atau pesan untuk Rian &amp; Windi. Pesan hanya dapat dibaca oleh admin undangan.</p>
+          <form className="rsvp-form" onSubmit={submitMessage}>
+            <label htmlFor="guest-message">Pesan untuk kedua mempelai</label>
+            <textarea
+              id="guest-message"
+              required
+              maxLength={2000}
+              rows={5}
+              value={guestMessage}
+              onChange={event => {
+                setGuestMessage(event.target.value);
+                setMessageError("");
+                setMessageSuccess("");
+              }}
+              placeholder="Tuliskan doa dan pesan Anda di sini..."
+            />
+            <small className="message-character-count">{guestMessage.length}/2000 karakter</small>
+            {messageError && <p className="rsvp-message rsvp-error" role="alert">{messageError}</p>}
+            {messageSuccess && <p className="rsvp-message rsvp-success" role="status">{messageSuccess}</p>}
+            <button className="btn" type="submit" disabled={messageBusy || !guestMessage.trim() || Boolean(messageSuccess)}>
+              {messageBusy ? "Mengirim..." : messageSuccess ? "Pesan Terkirim" : "Kirim Pesan"}
             </button>
           </form>
         </section>

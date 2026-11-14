@@ -69,6 +69,15 @@ Deno.serve(async request => {
 
   try {
     if (request.method === "GET") {
+      if (new URL(request.url).searchParams.get("resource") === "messages") {
+        const { data, error } = await supabase.from("guest_messages")
+          .select("id,guest_id,message,read_at,created_at,guest:guests!inner(name,phone,slug)")
+          .order("created_at", { ascending: false })
+          .limit(500);
+        if (error) throw error;
+        return json(request, { messages: data });
+      }
+
       const { data, error } = await supabase.from("guests")
         .select("id,name,phone,relation,category,internal_note,slug,rsvp_status,party_size,wishes,whatsapp_status,whatsapp_opened_at,created_at,updated_at")
         .order("created_at", { ascending: false });
@@ -78,6 +87,27 @@ Deno.serve(async request => {
 
     if (request.method === "POST") {
       const body = await readJson(request) as Record<string, unknown> | null;
+      if (body?.action === "mark_message_read") {
+        if (typeof body.id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.id)) {
+          return json(request, { error: "ID pesan tidak valid." }, 400);
+        }
+        const { data, error } = await supabase.from("guest_messages")
+          .update({ read_at: new Date().toISOString() })
+          .eq("id", body.id)
+          .is("read_at", null)
+          .select("id,read_at")
+          .maybeSingle();
+        if (error) throw error;
+        if (!data) {
+          const { data: existing, error: existingError } = await supabase.from("guest_messages")
+            .select("id,read_at").eq("id", body.id).maybeSingle();
+          if (existingError) throw existingError;
+          if (!existing) return json(request, { error: "Pesan tidak ditemukan." }, 404);
+          return json(request, { message: existing });
+        }
+        return json(request, { message: data });
+      }
+
       if (body?.action === "bulk_create") {
         const { rows: validRows, results } = prepareGuestBatch(body.guests);
 

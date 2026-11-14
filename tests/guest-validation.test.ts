@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { authorizeAdmin, bearerToken, createAdminSession, isValidAdminPasswordHash, verifyAdminPassword, verifyAdminSession } from "../supabase/functions/_shared/admin-auth.ts";
 import { createGuestRecord, prepareGuestBatch, updateGuestRecord, type GuestRepository } from "../supabase/functions/_shared/guest-operations.ts";
-import { normalizePhone, slugForName, validateGuestInput, validateGuestUpdate, validatePublicRsvp } from "../supabase/functions/_shared/guest-validation.ts";
+import { normalizePhone, slugForName, validateGuestInput, validateGuestUpdate, validatePublicGuestMessage, validatePublicRsvp } from "../supabase/functions/_shared/guest-validation.ts";
 import { guestAnalytics, guestsCsv, invitationMessage, inviteUrl, normalizeWhatsAppNumber } from "../src/admin/guest-utils.ts";
 
 test("requires a non-empty guest name and a supported category", () => {
@@ -143,6 +143,19 @@ test("validates public RSVP submissions and limits them to the selected invitati
     rsvp_status: "attending",
     party_size: 7,
   }), /antara 1 dan 6/);
+});
+
+test("validates public invitation messages and preserves intentional line breaks", () => {
+  assert.deepEqual(validatePublicGuestMessage({
+    slug: "windi-nuraeni-1234567890abcdef",
+    message: "  Semoga bahagia!\r\nSalam hangat.  ",
+  }), {
+    slug: "windi-nuraeni-1234567890abcdef",
+    message: "Semoga bahagia!\nSalam hangat.",
+  });
+  assert.throws(() => validatePublicGuestMessage({ slug: "nama-valid", message: " \n " }), /Tulis pesan terlebih dahulu/);
+  assert.throws(() => validatePublicGuestMessage({ slug: "invalid slug", message: "Pesan" }), /Tautan undangan tidak valid/);
+  assert.throws(() => validatePublicGuestMessage({ slug: "nama-valid", message: "a".repeat(2001) }), /maksimal 2000 karakter/);
 });
 
 test("summarizes RSVP metrics without category breakdowns and handles empty data", () => {

@@ -40,7 +40,7 @@ The guest data migration is in `supabase/migrations`. It enables RLS and revokes
 
    Enter the production website origin and any local development origins when prompted. The script asks for the password securely, stores only a PBKDF2-SHA256 hash in Supabase secrets, generates a signing secret, and removes its temporary secrets file. The default username is `admin`.
 
-4. Deploy the migration and Edge Functions:
+4. Deploy migrations and Edge Functions:
 
    ```powershell
    supabase db push
@@ -55,12 +55,13 @@ The guest data migration is in `supabase/migrations`. It enables RLS and revokes
 
 `vercel.json` rewrites `/admin` to the Vite app entry point so direct navigation and refresh work on Vercel. Other static hosts must provide the equivalent SPA fallback.
 
-`admin-session` verifies the configured username and PBKDF2 password hash, applies a server-side attempt limit, and issues a signed session that expires after four hours. `admin-guests` verifies that signed session on every operation. The Edge Functions enforce `APP_ORIGINS`; include the exact HTTPS production origin and the local origin(s) you use, without a trailing path. `public-invite` returns only a guest's display name for lookup and accepts RSVP status/count updates only for a valid personal invitation slug. It never returns phone numbers, internal notes, or wishes.
+`admin-session` verifies the configured username and PBKDF2 password hash, applies a server-side attempt limit, and issues a signed session that expires after four hours. `admin-guests` verifies that signed session on every operation. The Edge Functions enforce `APP_ORIGINS`; include the exact HTTPS production origin and the local origin(s) you use, without a trailing path. `public-invite` returns only a guest's display name for lookup, accepts RSVP status/count updates, and accepts a message submission only for a valid personal invitation slug. The public function never returns messages, phone numbers, internal notes, or wishes.
 
 ## Guest and WhatsApp behavior
 
 - Guest categories: Keluarga, Teman, Rekan Kerja, and Lainnya.
 - Guests opening their personal invitation can submit or update an RSVP status and attendance count; the response is stored on that guest record and is visible in the admin dashboard. Only `attending`/`declined` status and a count from 1–6 are accepted; public guests cannot change notes or other fields.
+- Guests opening their personal invitation can also send up to 2,000 characters per message. Messages are private to the admin inbox, retain line breaks, and are limited to one message per invitation every 60 seconds. Admins can search/filter all or unread messages and mark them read. The inbox displays the 500 newest messages; deleting a guest also deletes their messages.
 - The admin dashboard summarizes RSVP responses, response rate, confirmed headcount, pending replies, declines, and wishes without category analytics. Clicking an RSVP metric filters the guest list.
 - Bulk guest import supports CSV files and pasted comma/tab-separated rows, with a downloadable template, preview, row validation, and confirmation before saving. Imports are limited to 500 rows; likely duplicate phone numbers (or names when no phone is given) are flagged and unchecked by default, but an admin can explicitly select a flagged row.
 - Each guest gets a unique slug when created. Editing the name does not modify that slug or invalidate the old link.

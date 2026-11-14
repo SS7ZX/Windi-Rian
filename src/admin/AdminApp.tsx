@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { supabaseConfigured } from "./supabase";
-import { createGuest, deleteGuest, getAdminToken, listGuests, loginAdmin, logoutAdmin, markWhatsAppOpened, updateGuest, type BulkGuestResult } from "./api";
-import { emptyGuestDraft, guestCategories, type Guest, type GuestDraft, type GuestUpdateDraft, type RsvpStatus } from "./types";
+import { createGuest, deleteGuest, getAdminToken, listGuestMessages, listGuests, loginAdmin, logoutAdmin, markGuestMessageRead, markWhatsAppOpened, updateGuest, type BulkGuestResult } from "./api";
+import { emptyGuestDraft, guestCategories, type Guest, type GuestDraft, type GuestMessage, type GuestUpdateDraft, type RsvpStatus } from "./types";
 import { guestAnalytics, guestsCsv, invitationMessage, inviteUrl, normalizeWhatsAppNumber, validateGuestDraft } from "./guest-utils";
 import GuestImportModal from "./GuestImportModal";
 import "./admin.css";
@@ -19,6 +19,13 @@ const rsvpLabels: Record<RsvpStatus, string> = {
   attending: "Hadir",
   declined: "Tidak hadir",
 };
+
+function formatMessageDate(value: string): string {
+  return new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
 
 function Icon({ name }: { name: "search" | "plus" | "download" | "upload" | "edit" | "trash" | "copy" | "open" | "message" | "logout" | "users" | "check" | "clock" | "heart" }) {
   const paths: Record<typeof name, string> = {
@@ -149,7 +156,12 @@ export default function AdminApp() {
   const [session, setSession] = useState<string | null>(() => getAdminToken());
   const [signingIn, setSigningIn] = useState(false);
   const [guests, setGuests] = useState<Guest[]>([]);
+  const [guestMessages, setGuestMessages] = useState<GuestMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState("");
+  const [markingMessageId, setMarkingMessageId] = useState<string | null>(null);
+  const [messagesRefreshKey, setMessagesRefreshKey] = useState(0);
   const [loadError, setLoadError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [query, setQuery] = useState("");
@@ -168,6 +180,7 @@ export default function AdminApp() {
     const expireSession = () => {
       setSession(null);
       setGuests([]);
+      setGuestMessages([]);
       setLoadError("Sesi admin berakhir. Silakan masuk kembali.");
     };
     window.addEventListener("admin-session-expired", expireSession);
@@ -187,6 +200,20 @@ export default function AdminApp() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [session, refreshKey]);
+
+  useEffect(() => {
+    if (!session) return;
+    let active = true;
+    Promise.resolve().then(() => {
+      if (!active) return null;
+      setMessagesLoading(true);
+      setMessagesError("");
+      return listGuestMessages();
+    }).then(data => { if (active && data) setGuestMessages(data); })
+      .catch(error => { if (active) setMessagesError(error instanceof Error ? error.message : "Pesan tamu gagal dimuat."); })
+      .finally(() => { if (active) setMessagesLoading(false); });
+    return () => { active = false; };
+  }, [session, refreshKey, messagesRefreshKey]);
 
   useEffect(() => {
     if (!toast) return;
@@ -220,6 +247,19 @@ export default function AdminApp() {
     logoutAdmin();
     setSession(null);
     setGuests([]);
+    setGuestMessages([]);
+  };
+
+  const markMessageRead = async (id: string) => {
+    setMarkingMessageId(id);
+    try {
+      const result = await markGuestMessageRead(id);
+      setGuestMessages(current => current.map(message => message.id === id ? { ...message, read_at: result.read_at } : message));
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Status pesan gagal diperbarui." });
+    } finally {
+      setMarkingMessageId(null);
+    }
   };
 
   const saveGuest = async (draft: GuestDraft | GuestUpdateDraft) => {
@@ -261,7 +301,8 @@ export default function AdminApp() {
       await deleteGuest(modal.guest.id);
       setGuests(current => current.filter(guest => guest.id !== modal.guest.id));
       setModal(null);
-      setToast({ type: "success", message: "Tamu dan data RSVP/ucapannya berhasil dihapus." });
+      setGuestMessages(current => current.filter(message => message.guest_id !== modal.guest.id));
+      setToast({ type: "success", message: "Tamu, RSVP, dan pesan terkait berhasil dihapus." });
     } catch (error) {
       setToast({ type: "error", message: error instanceof Error ? error.message : "Tamu gagal dihapus." });
     } finally {
@@ -354,6 +395,8 @@ export default function AdminApp() {
           </div>
         </section>
 
+        <GuestMessageInbox messages={guestMessages} loading={messagesLoading} error={messagesError} markingId={markingMessageId} onMarkRead={id => void markMessageRead(id)} onRefresh={() => setMessagesRefreshKey(key => key + 1)} />
+
         <section className="admin-panel">
           <div className="admin-panel-heading"><div><h2>Semua tamu</h2><p>{filteredGuests.length} dari {guests.length} tamu</p></div><button className="admin-button admin-button-light" onClick={exportCsv} disabled={!filteredGuests.length}><Icon name="download" />Ekspor CSV</button></div>
           <div className="admin-filters">
@@ -419,6 +462,58 @@ function GuestCard({ guest, onEdit, onDelete, onCopy, onShare }: { guest: Guest;
 
 function RsvpBadge({ status, count }: { status: RsvpStatus; count?: number }) {
   return <span className={`admin-rsvp admin-rsvp-${status}`}>{rsvpLabels[status]}{count && count > 1 ? ` · ${count} orang` : ""}</span>;
+}
+
+function GuestMessageInbox({ messages, loading, error, markingId, onMarkRead, onRefresh }: {
+  messages: GuestMessage[];
+  loading: boolean;
+  error: string;
+  markingId: string | null;
+  onMarkRead: (id: string) => void;
+  onRefresh: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const unreadCount = messages.filter(message => !message.read_at).length;
+  const visibleMessages = messages.filter(message => {
+    if (filter === "unread" && message.read_at) return false;
+    const search = query.trim().toLowerCase();
+    return !search || message.guest.name.toLowerCase().includes(search) || message.message.toLowerCase().includes(search);
+  });
+
+  return <section className="admin-panel admin-message-inbox" aria-labelledby="message-inbox-title">
+    <div className="admin-panel-heading">
+      <div><h2 id="message-inbox-title">Pesan dari tamu</h2><p>{messages.length === 500 ? `Menampilkan 500 pesan terbaru · ${unreadCount} belum dibaca` : `${messages.length} pesan · ${unreadCount} belum dibaca`}</p></div>
+      <div className="admin-message-heading-actions">
+        <span className={`admin-message-count${unreadCount ? " is-unread" : ""}`} aria-label={`${unreadCount} pesan belum dibaca`}>{unreadCount}</span>
+        <button type="button" className="admin-button admin-button-light" onClick={onRefresh} disabled={loading}>{loading ? "Memuat..." : "Muat ulang"}</button>
+      </div>
+    </div>
+    <div className="admin-message-filters">
+      <label className="admin-search"><Icon name="search" /><span className="sr-only">Cari pesan atau nama tamu</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Cari pesan atau nama tamu..." /></label>
+      <div className="admin-message-tabs" role="group" aria-label="Filter pesan">
+        <button type="button" className={filter === "all" ? "is-active" : ""} onClick={() => setFilter("all")}>Semua <span>{messages.length}</span></button>
+        <button type="button" className={filter === "unread" ? "is-active" : ""} onClick={() => setFilter("unread")}>Belum dibaca <span>{unreadCount}</span></button>
+      </div>
+    </div>
+    {error && <div className="admin-inline-error" role="alert"><p>{error}</p><button type="button" className="admin-button admin-button-light" onClick={onRefresh}>Coba lagi</button></div>}
+    {loading ? <div className="admin-empty">Memuat pesan tamu...</div> : !error && visibleMessages.length === 0
+      ? <div className="admin-empty"><span className="admin-empty-icon" aria-hidden="true">✉</span><h3>{query || filter === "unread" ? "Pesan tidak ditemukan" : "Belum ada pesan"}</h3><p>{query || filter === "unread" ? "Coba ubah pencarian atau filter." : "Pesan yang dikirim dari undangan personal akan muncul di sini."}</p></div>
+      : !error && <div className="admin-message-list">{visibleMessages.map(message => (
+        <article className={`admin-message-card${message.read_at ? "" : " is-unread"}`} key={message.id}>
+          <div className="admin-message-card-heading">
+            <span className="admin-guest-avatar">{message.guest.name.slice(0, 1).toUpperCase()}</span>
+            <div className="admin-message-sender"><b>{message.guest.name}</b><small>{message.guest.phone || "Nomor WhatsApp belum diisi"}</small></div>
+            <span className={`admin-message-status${message.read_at ? "" : " is-unread"}`}>{message.read_at ? "Dibaca" : "Baru"}</span>
+          </div>
+          <p className="admin-message-body">{message.message}</p>
+          <div className="admin-message-footer">
+            <time dateTime={message.created_at}>{formatMessageDate(message.created_at)}</time>
+            {!message.read_at && <button type="button" className="admin-button admin-button-light" onClick={() => onMarkRead(message.id)} disabled={markingId === message.id}>{markingId === message.id ? "Menyimpan..." : "Tandai dibaca"}</button>}
+          </div>
+        </article>
+      ))}</div>}
+  </section>;
 }
 
 function GuestActions({ guest, onEdit, onDelete, onCopy, onShare }: { guest: Guest; onEdit: () => void; onDelete: () => void; onCopy: () => void; onShare: () => void }) {
