@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { C, P } from "./config";
 import { useCountdown, useReveal } from "./hooks";
-import { lookupInvite, submitInviteMessage, submitInviteRsvp, type RsvpChoice } from "./admin/public-invite";
+import { lookupInvite, submitGuestResponse, type RsvpChoice } from "./admin/public-invite";
 
 const LIVE = ""; // isi link YouTube Live (https://...) kalau ada siaran langsung, kosongkan kalau tidak
 const TL = [ // edit cerita sesuai kisah kalian
@@ -45,13 +45,10 @@ export default function App() {
   const [inviteError, setInviteError] = useState("");
   const [rsvpChoice, setRsvpChoice] = useState<RsvpChoice | "">("");
   const [partySize, setPartySize] = useState(1);
-  const [rsvpBusy, setRsvpBusy] = useState(false);
-  const [rsvpError, setRsvpError] = useState("");
-  const [rsvpSuccess, setRsvpSuccess] = useState("");
+  const [responseBusy, setResponseBusy] = useState(false);
+  const [responseError, setResponseError] = useState("");
+  const [responseSuccess, setResponseSuccess] = useState("");
   const [guestMessage, setGuestMessage] = useState("");
-  const [messageBusy, setMessageBusy] = useState(false);
-  const [messageError, setMessageError] = useState("");
-  const [messageSuccess, setMessageSuccess] = useState("");
   const audio = useRef<HTMLAudioElement>(null);
   const cd = useCountdown(C.countdownTarget);
   useReveal();
@@ -69,34 +66,22 @@ export default function App() {
     return () => { active = false; };
   }, [inviteSlug]);
 
-  const submitRsvp = async (event: FormEvent<HTMLFormElement>) => {
+  const submitResponse = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!inviteSlug || !rsvpChoice || inviteLoading || inviteError) return;
-    setRsvpBusy(true);
-    setRsvpError("");
-    setRsvpSuccess("");
+    if (!inviteSlug || inviteLoading || inviteError || (!rsvpChoice && !guestMessage.trim())) return;
+    setResponseBusy(true);
+    setResponseError("");
     try {
-      await submitInviteRsvp(inviteSlug, rsvpChoice, partySize);
-      setRsvpSuccess(`Terima kasih, konfirmasi untuk ${guest} berhasil disimpan.`);
+      await submitGuestResponse(inviteSlug, rsvpChoice, partySize, guestMessage);
+      setResponseSuccess(rsvpChoice && guestMessage.trim()
+        ? `Konfirmasi kehadiran dan pesan untuk ${guest} berhasil dikirim.`
+        : rsvpChoice
+          ? `Terima kasih, konfirmasi untuk ${guest} berhasil disimpan.`
+          : "Pesan berhasil dikirim. Terima kasih sudah berbagi doa dan harapan.");
     } catch (error) {
-      setRsvpError(error instanceof Error ? error.message : "Konfirmasi gagal disimpan. Silakan coba lagi.");
+      setResponseError(error instanceof Error ? error.message : "Konfirmasi/pesan gagal dikirim. Silakan coba lagi.");
     } finally {
-      setRsvpBusy(false);
-    }
-  };
-
-  const submitMessage = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!inviteSlug || inviteLoading || inviteError || messageSuccess) return;
-    setMessageBusy(true);
-    setMessageError("");
-    try {
-      await submitInviteMessage(inviteSlug, guestMessage);
-      setMessageSuccess("Pesan berhasil dikirim. Terima kasih sudah berbagi doa dan harapan.");
-    } catch (error) {
-      setMessageError(error instanceof Error ? error.message : "Pesan gagal dikirim. Silakan coba lagi.");
-    } finally {
-      setMessageBusy(false);
+      setResponseBusy(false);
     }
   };
 
@@ -134,7 +119,7 @@ export default function App() {
       </div>
 
       {phase === "buka" && (<>
-        <nav className="nav">{[["salam", "Awal"], ["mempelai", "Mempelai"], ["acara", "Acara"], ...(inviteSlug && !inviteLoading && !inviteError ? [["konfirmasi", "RSVP"], ["pesan", "Pesan"]] : []), ["galeri", "Galeri"]].map(([id, t]) => <a key={id} href={`#${id}`}>{t}</a>)}</nav>
+        <nav className="nav">{[["salam", "Awal"], ["mempelai", "Mempelai"], ["acara", "Acara"], ...(inviteSlug && !inviteLoading && !inviteError ? [["konfirmasi", "RSVP & Pesan"]] : []), ["galeri", "Galeri"]].map(([id, t]) => <a key={id} href={`#${id}`}>{t}</a>)}</nav>
       </>)}
 
       <section id="salam" className="sec">
@@ -178,17 +163,21 @@ export default function App() {
         <div className="evt rv"><small>{C.venue}</small>{C.address && <p>{C.address}</p>}
           <a className="btn" href={C.mapsUrl} target="_blank" rel="noreferrer">Buka Google Maps</a>
           <a className="btn ghost" href={cal} target="_blank" rel="noreferrer">Simpan ke kalender</a></div>
-        {inviteSlug && !inviteLoading && !inviteError && <a className="btn" href="#konfirmasi">Konfirmasi Kehadiran</a>}
+        {inviteSlug && !inviteLoading && !inviteError && <a className="btn" href="#konfirmasi">Konfirmasi &amp; Kirim Pesan</a>}
       </section>
 
       {inviteSlug && !inviteLoading && !inviteError && (
         <section id="konfirmasi" className="sec">
-          <h2 className="gold">Konfirmasi Kehadiran</h2>
-          <p className="small">Konfirmasi untuk {guest}. Pilih jawaban dan jumlah yang hadir.</p>
-          <form className="rsvp-form" onSubmit={submitRsvp}>
+          <h2 className="gold">Konfirmasi &amp; Kirim Pesan</h2>
+          <p className="small">Konfirmasi kehadiran dan sampaikan doa atau pesan untuk Rian &amp; Windi. Keduanya bisa dikirim sekaligus.</p>
+          <form className="rsvp-form" onSubmit={submitResponse}>
             <label>
-              Konfirmasi kehadiran
-              <select required value={rsvpChoice} onChange={event => setRsvpChoice(event.target.value as RsvpChoice | "")}>
+              Konfirmasi kehadiran <small>Opsional jika hanya ingin mengirim pesan</small>
+              <select value={rsvpChoice} onChange={event => {
+                setRsvpChoice(event.target.value as RsvpChoice | "");
+                setResponseError("");
+                setResponseSuccess("");
+              }}>
                 <option value="">Pilih jawaban</option>
                 <option value="attending">Insyaallah hadir</option>
                 <option value="declined">Mohon maaf, tidak dapat hadir</option>
@@ -200,39 +189,24 @@ export default function App() {
                 {[1, 2, 3, 4, 5, 6].map(count => <option key={count} value={count}>{count} orang</option>)}
               </select>
             </label>}
-            {rsvpError && <p className="rsvp-message rsvp-error" role="alert">{rsvpError}</p>}
-            {rsvpSuccess && <p className="rsvp-message rsvp-success" role="status">{rsvpSuccess}</p>}
-            <button className="btn" type="submit" disabled={rsvpBusy || !rsvpChoice}>
-              {rsvpBusy ? "Menyimpan..." : rsvpSuccess ? "Perbarui Konfirmasi" : "Kirim Konfirmasi"}
-            </button>
-          </form>
-        </section>
-      )}
-
-      {inviteSlug && !inviteLoading && !inviteError && (
-        <section id="pesan" className="sec alt">
-          <h2 className="gold">Kirim Pesan</h2>
-          <p className="small">Sampaikan doa, ucapan, atau pesan untuk Rian &amp; Windi. Pesan hanya dapat dibaca oleh admin undangan.</p>
-          <form className="rsvp-form" onSubmit={submitMessage}>
-            <label htmlFor="guest-message">Pesan untuk kedua mempelai</label>
+            <label htmlFor="guest-message">Pesan atau doa <small>Opsional, maksimal 2000 karakter</small></label>
             <textarea
               id="guest-message"
-              required
               maxLength={2000}
               rows={5}
               value={guestMessage}
               onChange={event => {
                 setGuestMessage(event.target.value);
-                setMessageError("");
-                setMessageSuccess("");
+                setResponseError("");
+                setResponseSuccess("");
               }}
-              placeholder="Tuliskan doa dan pesan Anda di sini..."
+              placeholder="Tuliskan doa atau pesan Anda di sini..."
             />
             <small className="message-character-count">{guestMessage.length}/2000 karakter</small>
-            {messageError && <p className="rsvp-message rsvp-error" role="alert">{messageError}</p>}
-            {messageSuccess && <p className="rsvp-message rsvp-success" role="status">{messageSuccess}</p>}
-            <button className="btn" type="submit" disabled={messageBusy || !guestMessage.trim() || Boolean(messageSuccess)}>
-              {messageBusy ? "Mengirim..." : messageSuccess ? "Pesan Terkirim" : "Kirim Pesan"}
+            {responseError && <p className="rsvp-message rsvp-error" role="alert">{responseError}</p>}
+            {responseSuccess && <p className="rsvp-message rsvp-success" role="status">{responseSuccess}</p>}
+            <button className="btn" type="submit" disabled={responseBusy || (!rsvpChoice && !guestMessage.trim())}>
+              {responseBusy ? "Mengirim..." : rsvpChoice && guestMessage.trim() ? "Kirim Konfirmasi & Pesan" : rsvpChoice ? "Kirim Konfirmasi" : "Kirim Pesan"}
             </button>
           </form>
         </section>

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { authorizeAdmin, bearerToken, createAdminSession, isValidAdminPasswordHash, verifyAdminPassword, verifyAdminSession } from "../supabase/functions/_shared/admin-auth.ts";
 import { createGuestRecord, prepareGuestBatch, updateGuestRecord, type GuestRepository } from "../supabase/functions/_shared/guest-operations.ts";
-import { normalizePhone, slugForName, validateGuestInput, validateGuestUpdate, validatePublicGuestMessage, validatePublicRsvp } from "../supabase/functions/_shared/guest-validation.ts";
+import { normalizePhone, slugForName, validateGuestInput, validateGuestUpdate, validatePublicGuestMessage, validatePublicGuestSubmission, validatePublicRsvp } from "../supabase/functions/_shared/guest-validation.ts";
 import { guestAnalytics, guestsCsv, invitationMessage, inviteUrl, normalizeWhatsAppNumber } from "../src/admin/guest-utils.ts";
 
 test("requires a non-empty guest name and a supported category", () => {
@@ -156,6 +156,43 @@ test("validates public invitation messages and preserves intentional line breaks
   assert.throws(() => validatePublicGuestMessage({ slug: "nama-valid", message: " \n " }), /Tulis pesan terlebih dahulu/);
   assert.throws(() => validatePublicGuestMessage({ slug: "invalid slug", message: "Pesan" }), /Tautan undangan tidak valid/);
   assert.throws(() => validatePublicGuestMessage({ slug: "nama-valid", message: "a".repeat(2001) }), /maksimal 2000 karakter/);
+});
+
+test("validates a combined guest submission with RSVP and optional message", () => {
+  const slug = "windi-nuraeni-1234567890abcdef";
+  assert.deepEqual(validatePublicGuestSubmission({
+    slug,
+    rsvp_status: "attending",
+    party_size: 2,
+    message: " Semoga acaranya lancar. ",
+  }), {
+    slug,
+    rsvp_status: "attending",
+    party_size: 2,
+    message: "Semoga acaranya lancar.",
+  });
+  assert.deepEqual(validatePublicGuestSubmission({
+    slug,
+    rsvp_status: "declined",
+    party_size: 6,
+    message: "",
+  }), {
+    slug,
+    rsvp_status: "declined",
+    party_size: 1,
+    message: null,
+  });
+  assert.deepEqual(validatePublicGuestSubmission({
+    slug,
+    message: "Doa terbaik untuk kalian.",
+  }), {
+    slug,
+    rsvp_status: null,
+    party_size: 1,
+    message: "Doa terbaik untuk kalian.",
+  });
+  assert.throws(() => validatePublicGuestSubmission({ slug, message: "  " }), /Pilih konfirmasi kehadiran atau tulis pesan/);
+  assert.throws(() => validatePublicGuestSubmission({ slug, rsvp_status: "attending", party_size: 7 }), /antara 1 dan 6/);
 });
 
 test("summarizes RSVP metrics without category breakdowns and handles empty data", () => {

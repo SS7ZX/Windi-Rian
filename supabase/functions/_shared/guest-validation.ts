@@ -28,8 +28,48 @@ export type PublicGuestMessageInput = {
   message: string;
 };
 
+export type PublicGuestSubmissionInput = {
+  slug: string;
+  rsvp_status: "attending" | "declined" | null;
+  party_size: number;
+  message: string | null;
+};
+
 function validInviteSlug(value: unknown): value is string {
   return typeof value === "string" && value.length <= 100 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
+}
+
+export function validatePublicGuestSubmission(value: unknown): PublicGuestSubmissionInput {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new GuestValidationError("Data konfirmasi/pesan tidak valid.");
+  }
+  const input = value as Record<string, unknown>;
+  if (!validInviteSlug(input.slug)) throw new GuestValidationError("Tautan undangan tidak valid.");
+
+  let rsvpStatus: PublicGuestSubmissionInput["rsvp_status"] = null;
+  let partySize = 1;
+  if (input.rsvp_status !== undefined && input.rsvp_status !== null && input.rsvp_status !== "") {
+    if (input.rsvp_status !== "attending" && input.rsvp_status !== "declined") {
+      throw new GuestValidationError("Pilih konfirmasi hadir atau tidak hadir.");
+    }
+    rsvpStatus = input.rsvp_status;
+    if (rsvpStatus === "attending") {
+      if (typeof input.party_size !== "number" || !Number.isInteger(input.party_size) || input.party_size < 1 || input.party_size > 6) {
+        throw new GuestValidationError("Jumlah tamu hadir harus antara 1 dan 6 orang.");
+      }
+      partySize = input.party_size;
+    }
+  }
+
+  let message: string | null = null;
+  if (input.message !== undefined && input.message !== null) {
+    if (typeof input.message !== "string") throw new GuestValidationError("Pesan harus berupa teks.");
+    const normalized = input.message.replace(/\r\n?/g, "\n").trim();
+    if (normalized.length > 2000) throw new GuestValidationError("Pesan maksimal 2000 karakter.");
+    message = normalized || null;
+  }
+  if (!rsvpStatus && !message) throw new GuestValidationError("Pilih konfirmasi kehadiran atau tulis pesan terlebih dahulu.");
+  return { slug: input.slug, rsvp_status: rsvpStatus, party_size: partySize, message };
 }
 
 export function validatePublicGuestMessage(value: unknown): PublicGuestMessageInput {
